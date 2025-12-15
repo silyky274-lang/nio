@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+
+{% block title %}APEX HUNTER - Target Input{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>🎯 Target Input</h2>
+    <p>Enter a target for automated bug bounty hunting. APEX HUNTER will perform comprehensive analysis in under 8 minutes.</p>
+    
+    <form id="hunt-form">
+        <div class="input-group">
+            <label for="target">Target URL or Domain</label>
+            <input type="text" id="target" name="target" placeholder="https://example.com or example.com" required>
+            <small style="color: #666; margin-top: 0.5rem; display: block;">
+                Supported formats: URLs, domains, IP addresses, IP ranges
+            </small>
+        </div>
+        
+        <div class="input-group">
+            <label for="hunt-type">Hunt Type</label>
+            <select id="hunt-type" name="hunt-type">
+                <option value="comprehensive">Comprehensive (All Engines)</option>
+                <option value="stealth">Stealth Mode (Passive Only)</option>
+                <option value="aggressive">Aggressive (Active Testing)</option>
+                <option value="business-logic">Business Logic Focus</option>
+            </select>
+        </div>
+        
+        <div class="input-group">
+            <label for="time-limit">Time Limit</label>
+            <select id="time-limit" name="time-limit">
+                <option value="480">8 minutes (Standard)</option>
+                <option value="300">5 minutes (Quick)</option>
+                <option value="600">10 minutes (Extended)</option>
+            </select>
+        </div>
+        
+        <div class="input-group">
+            <label>
+                <input type="checkbox" id="auto-evidence" name="auto-evidence" checked>
+                Generate evidence packages automatically
+            </label>
+        </div>
+        
+        <div class="input-group">
+            <label>
+                <input type="checkbox" id="chain-focus" name="chain-focus" checked>
+                Focus on high-value chain exploits
+            </label>
+        </div>
+        
+        <button type="submit" class="btn" id="start-btn">
+            🚀 START HUNT
+        </button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>📋 Pre-Hunt Checklist</h2>
+    <div class="grid">
+        <div>
+            <h3>✅ System Status</h3>
+            <ul>
+                <li>✅ Memory: 2.7GB / 6.0GB available</li>
+                <li>✅ Knowledge Base: 70,040 records loaded</li>
+                <li>✅ Chain Templates: 10,010 active</li>
+                <li>✅ Business Logic Rules: 50,030 loaded</li>
+                <li>✅ All engines operational</li>
+            </ul>
+        </div>
+        
+        <div>
+            <h3>🎯 Hunt Capabilities</h3>
+            <ul>
+                <li>🔍 Certificate transparency analysis</li>
+                <li>📜 Historical JavaScript mining</li>
+                <li>🧠 Business logic flaw detection</li>
+                <li>⛓️ Chain exploit correlation</li>
+                <li>🤖 AI-powered analysis</li>
+                <li>📹 Automated evidence collection</li>
+            </ul>
+        </div>
+        
+        <div>
+            <h3>⚡ Performance Targets</h3>
+            <ul>
+                <li>🕐 Hunt completion: &lt; 8 minutes</li>
+                <li>🎯 Chain exploits: 3-5 per target</li>
+                <li>💰 Estimated bounty: $500+ per chain</li>
+                <li>📊 Payment probability: 80%+</li>
+                <li>🧠 Business impact: 7.0+ score</li>
+            </ul>
+        </div>
+        
+        <div>
+            <h3>🛡️ Ethical Guidelines</h3>
+            <ul>
+                <li>🔒 Authorized testing only</li>
+                <li>📝 Responsible disclosure</li>
+                <li>🚫 No data exfiltration</li>
+                <li>⚖️ Legal compliance</li>
+                <li>🤝 Bug bounty program rules</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>🏆 Expected Results</h2>
+    <div class="grid">
+        <div class="chain-card">
+            <h3>Authentication Chains</h3>
+            <p>OAuth bypasses, session fixation, token manipulation</p>
+            <div class="bounty-amount">$1,500 - $8,000</div>
+            <div class="probability">85% Success Rate</div>
+        </div>
+        
+        <div class="chain-card">
+            <h3>Business Logic Chains</h3>
+            <p>Payment bypasses, workflow manipulation, race conditions</p>
+            <div class="bounty-amount">$1,000 - $6,000</div>
+            <div class="probability">88% Success Rate</div>
+        </div>
+        
+        <div class="chain-card">
+            <h3>Privilege Escalation</h3>
+            <p>IDOR chains, role manipulation, API escalation</p>
+            <div class="bounty-amount">$2,000 - $12,000</div>
+            <div class="probability">82% Success Rate</div>
+        </div>
+        
+        <div class="chain-card">
+            <h3>Data Exposure Chains</h3>
+            <p>Mass data access, filter bypasses, export escalation</p>
+            <div class="bounty-amount">$800 - $5,000</div>
+            <div class="probability">90% Success Rate</div>
+        </div>
+    </div>
+</div>
+
+<div class="card" id="hunt-progress" style="display: none;">
+    <h2>🔄 Hunt in Progress</h2>
+    <div id="progress-info">
+        <p><strong>Target:</strong> <span id="hunt-target"></span></p>
+        <p><strong>Stage:</strong> <span id="hunt-stage">Initializing</span></p>
+        <p><strong>Elapsed Time:</strong> <span id="hunt-time">0:00</span></p>
+        <p><strong>Remaining Time:</strong> <span id="hunt-remaining">8:00</span></p>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="hunt-progress-bar" style="width: 0%"></div>
+        </div>
+        
+        <p><strong>Progress:</strong> <span id="hunt-progress-text">0%</span></p>
+        
+        <div style="margin-top: 1rem;">
+            <button onclick="stopCurrentHunt()" class="btn btn-danger">Stop Hunt</button>
+            <button onclick="viewLiveMonitor()" class="btn btn-secondary">View Live Monitor</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let huntInterval;
+    let huntStartTime;
+    
+    document.getElementById('hunt-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const target = document.getElementById('target').value.trim();
+        if (!target) {
+            showAlert('Please enter a target', 'error');
+            return;
+        }
+        
+        // Validate target format
+        if (!isValidTarget(target)) {
+            showAlert('Please enter a valid URL, domain, or IP address', 'error');
+            return;
+        }
+        
+        startHunt(target);
+    });
+    
+    function isValidTarget(target) {
+        // Basic validation for URLs, domains, and IPs
+        const urlPattern = /^https?:\/\/.+/;
+        const domainPattern = /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/;
+        const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+        
+        return urlPattern.test(target) || domainPattern.test(target) || ipPattern.test(target);
+    }
+    
+    function startHunt(target) {
+        const startBtn = document.getElementById('start-btn');
+        startBtn.disabled = true;
+        startBtn.innerHTML = '<span class="loading"></span> Starting Hunt...';
+        
+        fetch('/start_hunt', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                target: target,
+                hunt_type: document.getElementById('hunt-type').value,
+                time_limit: parseInt(document.getElementById('time-limit').value),
+                auto_evidence: document.getElementById('auto-evidence').checked,
+                chain_focus: document.getElementById('chain-focus').checked
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Hunt started successfully!', 'success');
+                document.getElementById('hunt-target').textContent = target;
+                document.getElementById('hunt-progress').style.display = 'block';
+                huntStartTime = Date.now();
+                huntInterval = setInterval(updateHuntProgress, 1000);
+                
+                // Scroll to progress section
+                document.getElementById('hunt-progress').scrollIntoView({ behavior: 'smooth' });
+            } else {
+                showAlert('Error starting hunt: ' + data.error, 'error');
+                startBtn.disabled = false;
+                startBtn.innerHTML = '🚀 START HUNT';
+            }
+        })
+        .catch(error => {
+            showAlert('Error starting hunt', 'error');
+            startBtn.disabled = false;
+            startBtn.innerHTML = '🚀 START HUNT';
+        });
+    }
+    
+    function updateHuntProgress() {
+        fetch('/hunt_status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.active) {
+                    // Update progress display
+                    document.getElementById('hunt-stage').textContent = data.stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    document.getElementById('hunt-progress-bar').style.width = data.progress + '%';
+                    document.getElementById('hunt-progress-text').textContent = data.progress + '%';
+                    
+                    // Update time
+                    const elapsed = Math.floor((Date.now() - huntStartTime) / 1000);
+                    const remaining = Math.max(0, 480 - elapsed); // 8 minutes = 480 seconds
+                    document.getElementById('hunt-time').textContent = formatTime(elapsed);
+                    document.getElementById('hunt-remaining').textContent = formatTime(remaining);
+                    
+                    // Check if hunt completed
+                    if (data.progress >= 100 || !data.active) {
+                        clearInterval(huntInterval);
+                        showAlert('Hunt completed! Redirecting to results...', 'success');
+                        setTimeout(() => {
+                            window.location.href = '/chain_builder';
+                        }, 2000);
+                    }
+                } else {
+                    clearInterval(huntInterval);
+                    if (data.stage === 'error') {
+                        showAlert('Hunt failed: ' + (data.error || 'Unknown error'), 'error');
+                    } else if (data.stage === 'completed') {
+                        showAlert('Hunt completed successfully!', 'success');
+                        setTimeout(() => {
+                            window.location.href = '/chain_builder';
+                        }, 2000);
+                    }
+                    
+                    // Re-enable start button
+                    const startBtn = document.getElementById('start-btn');
+                    startBtn.disabled = false;
+                    startBtn.innerHTML = '🚀 START HUNT';
+                }
+            })
+            .catch(error => {
+                console.error('Error updating hunt progress:', error);
+            });
+    }
+    
+    function stopCurrentHunt() {
+        if (confirm('Are you sure you want to stop the current hunt?')) {
+            fetch('/stop_hunt', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('Hunt stopped successfully', 'success');
+                    clearInterval(huntInterval);
+                    document.getElementById('hunt-progress').style.display = 'none';
+                    
+                    // Re-enable start button
+                    const startBtn = document.getElementById('start-btn');
+                    startBtn.disabled = false;
+                    startBtn.innerHTML = '🚀 START HUNT';
+                } else {
+                    showAlert('Error stopping hunt: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showAlert('Error stopping hunt', 'error');
+            });
+        }
+    }
+    
+    function viewLiveMonitor() {
+        window.location.href = '/live_monitor';
+    }
+    
+    // Auto-focus on target input
+    document.getElementById('target').focus();
+</script>
+{% endblock %}

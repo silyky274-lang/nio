@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}APEX HUNTER - Bug Bounty Automation{% endblock %}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 100%);
+            color: #ffffff;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 1rem 2rem;
+            border-bottom: 2px solid #00ff41;
+            backdrop-filter: blur(10px);
+        }
+        
+        .header h1 {
+            color: #00ff41;
+            font-size: 2rem;
+            font-weight: bold;
+            text-shadow: 0 0 10px #00ff41;
+        }
+        
+        .nav {
+            display: flex;
+            gap: 2rem;
+            margin-top: 1rem;
+        }
+        
+        .nav a {
+            color: #ffffff;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border: 1px solid #333;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+        
+        .nav a:hover, .nav a.active {
+            background: #00ff41;
+            color: #000000;
+            box-shadow: 0 0 15px #00ff41;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid #333;
+            border-radius: 10px;
+            padding: 2rem;
+            margin: 1rem 0;
+            backdrop-filter: blur(10px);
+        }
+        
+        .card h2 {
+            color: #00ff41;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+        
+        .btn {
+            background: linear-gradient(45deg, #00ff41, #00cc33);
+            color: #000000;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 255, 65, 0.4);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(45deg, #ff4444, #cc0000);
+            color: #ffffff;
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(45deg, #666666, #444444);
+            color: #ffffff;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff41, #00cc33);
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        .status-active { background: #00ff41; }
+        .status-idle { background: #666; }
+        .status-error { background: #ff4444; }
+        
+        .memory-bar {
+            width: 100%;
+            height: 15px;
+            background: #333;
+            border-radius: 7px;
+            overflow: hidden;
+            margin: 0.5rem 0;
+        }
+        
+        .memory-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+            border-radius: 7px;
+        }
+        
+        .memory-low { background: #00ff41; }
+        .memory-medium { background: #ffaa00; }
+        .memory-high { background: #ff4444; }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .chain-card {
+            background: rgba(0, 255, 65, 0.1);
+            border: 1px solid #00ff41;
+            border-radius: 10px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+        
+        .chain-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 255, 65, 0.2);
+        }
+        
+        .bounty-amount {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #00ff41;
+            text-shadow: 0 0 10px #00ff41;
+        }
+        
+        .probability {
+            color: #ffaa00;
+            font-weight: bold;
+        }
+        
+        .input-group {
+            margin: 1rem 0;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #00ff41;
+            font-weight: bold;
+        }
+        
+        .input-group input, .input-group select, .input-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid #333;
+            border-radius: 5px;
+            color: #ffffff;
+            font-size: 1rem;
+        }
+        
+        .input-group input:focus, .input-group select:focus, .input-group textarea:focus {
+            outline: none;
+            border-color: #00ff41;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+        }
+        
+        .alert {
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+        }
+        
+        .alert-success {
+            background: rgba(0, 255, 65, 0.2);
+            border: 1px solid #00ff41;
+            color: #00ff41;
+        }
+        
+        .alert-error {
+            background: rgba(255, 68, 68, 0.2);
+            border: 1px solid #ff4444;
+            color: #ff4444;
+        }
+        
+        .alert-warning {
+            background: rgba(255, 170, 0, 0.2);
+            border: 1px solid #ffaa00;
+            color: #ffaa00;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #333;
+            border-radius: 50%;
+            border-top-color: #00ff41;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+            border-top: 1px solid #333;
+            margin-top: 4rem;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .nav {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+            
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 APEX HUNTER</h1>
+        <nav class="nav">
+            <a href="/" class="{% if request.endpoint == 'index' %}active{% endif %}">Dashboard</a>
+            <a href="/target_input" class="{% if request.endpoint == 'target_input' %}active{% endif %}">Target Input</a>
+            <a href="/live_monitor" class="{% if request.endpoint == 'live_monitor' %}active{% endif %}">Live Monitor</a>
+            <a href="/chain_builder" class="{% if request.endpoint == 'chain_builder' %}active{% endif %}">Chain Builder</a>
+            <a href="/report_workshop" class="{% if request.endpoint == 'report_workshop' %}active{% endif %}">Report Workshop</a>
+        </nav>
+    </div>
+    
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+    
+    <div class="footer">
+        <p>&copy; 2024 APEX HUNTER - Elite Bug Bounty Automation System</p>
+        <p>Optimized for 6GB RAM | 8-minute hunt cycles | Chain exploit specialist</p>
+    </div>
+    
+    <script>
+        // Global JavaScript functions
+        function showAlert(message, type = 'success') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            
+            const container = document.querySelector('.container');
+            container.insertBefore(alertDiv, container.firstChild);
+            
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
+        
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${minutes}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        function formatBytes(bytes) {
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            if (bytes === 0) return '0 B';
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+        }
+        
+        // Auto-refresh functionality
+        let autoRefresh = false;
+        
+        function toggleAutoRefresh() {
+            autoRefresh = !autoRefresh;
+            if (autoRefresh) {
+                refreshData();
+            }
+        }
+        
+        function refreshData() {
+            if (autoRefresh) {
+                location.reload();
+                setTimeout(refreshData, 5000); // Refresh every 5 seconds
+            }
+        }
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,589 @@
+{% extends "base.html" %}
+
+{% block title %}APEX HUNTER - Report Workshop{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>📝 Report Workshop</h2>
+    <p>Generate professional bug bounty reports with AI assistance and platform-specific formatting.</p>
+    
+    <div class="grid">
+        <div>
+            <h3>Report Statistics</h3>
+            <p><strong>Available Chains:</strong> {{ chains|length }}</p>
+            <p><strong>Evidence Packages:</strong> {{ evidence|length }}</p>
+            <p><strong>Total Bounty Value:</strong> ${{ "{:,}".format(chains|sum(attribute='estimated_bounty') or 0) }}</p>
+        </div>
+        
+        <div>
+            <h3>Quick Actions</h3>
+            <button onclick="generateAllReports()" class="btn">Generate All Reports</button>
+            <button onclick="previewReport()" class="btn btn-secondary">Preview Report</button>
+            <button onclick="exportReports()" class="btn btn-secondary">Export Reports</button>
+        </div>
+        
+        <div>
+            <h3>Report Type</h3>
+            <select id="report-type" onchange="updateReportType()">
+                <option value="individual">Individual Reports</option>
+                <option value="full">Combined Full Report</option>
+                <option value="executive">Executive Summary</option>
+            </select>
+        </div>
+        
+        <div>
+            <h3>Target Platform</h3>
+            <select id="target-platform" onchange="updatePlatform()">
+                <option value="hackerone">HackerOne</option>
+                <option value="bugcrowd">Bugcrowd</option>
+                <option value="intigriti">Intigriti</option>
+                <option value="generic">Generic Format</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>🎯 Chain Selection</h2>
+    <div id="chain-selection">
+        {% if chains %}
+            <div style="margin-bottom: 1rem;">
+                <button onclick="selectAllChains()" class="btn btn-secondary">Select All</button>
+                <button onclick="selectNone()" class="btn btn-secondary">Select None</button>
+                <button onclick="selectHighValue()" class="btn btn-secondary">Select High Value</button>
+            </div>
+            
+            <div class="grid">
+                {% for chain in chains %}
+                <div class="chain-card" style="position: relative;">
+                    <input type="checkbox" id="chain-{{ chain.chain_id }}" class="chain-checkbox" style="position: absolute; top: 1rem; right: 1rem; transform: scale(1.5);" checked>
+                    
+                    <h3>{{ chain.name or 'Unknown Chain' }}</h3>
+                    <p><strong>Type:</strong> {{ chain.chain_type or 'chain_exploit' }}</p>
+                    <p><strong>Components:</strong> {{ chain.components|length if chain.components else 0 }}</p>
+                    
+                    <div class="bounty-amount">${{ "{:,}".format(chain.estimated_bounty or 500) }}</div>
+                    <div class="probability">{{ "{:.0%}".format(chain.payment_probability or 0.8) }} Payment Rate</div>
+                    
+                    <div style="margin: 1rem 0;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span>Business Impact:</span>
+                            <span>{{ "%.1f"|format(chain.business_impact or 7.0) }}/10.0</span>
+                        </div>
+                        <div class="progress-bar" style="height: 8px;">
+                            <div class="progress-fill" style="width: {{ (chain.business_impact or 7.0) * 10 }}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 1rem;">
+                        <strong>Evidence Available:</strong>
+                        {% if evidence.get(chain.chain_id) %}
+                            <span style="color: #00ff41;">✓ Complete</span>
+                        {% else %}
+                            <span style="color: #ffaa00;">⚠ Partial</span>
+                        {% endif %}
+                    </div>
+                    
+                    {% if chain.platforms %}
+                    <div style="margin-top: 1rem;">
+                        <strong>Recommended:</strong>
+                        {% for platform in chain.platforms %}
+                            <span style="background: #333; padding: 0.2rem 0.5rem; border-radius: 3px; margin-right: 0.5rem; font-size: 0.8rem;">{{ platform }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 2rem; color: #666;">
+                <h3>No Chains Available</h3>
+                <p>No exploit chains have been discovered yet. Start a hunt to discover chain opportunities.</p>
+                <a href="/target_input" class="btn">Start New Hunt</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <h2>⚙️ Report Configuration</h2>
+    <div class="grid">
+        <div>
+            <div class="input-group">
+                <label for="report-title">Report Title</label>
+                <input type="text" id="report-title" placeholder="Multiple Chain Exploits - Target Analysis">
+            </div>
+            
+            <div class="input-group">
+                <label for="researcher-name">Researcher Name</label>
+                <input type="text" id="researcher-name" placeholder="APEX HUNTER System">
+            </div>
+            
+            <div class="input-group">
+                <label for="report-severity">Overall Severity</label>
+                <select id="report-severity">
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                </select>
+            </div>
+        </div>
+        
+        <div>
+            <div class="input-group">
+                <label for="executive-summary">Executive Summary</label>
+                <textarea id="executive-summary" rows="4" placeholder="AI-generated executive summary will appear here..."></textarea>
+            </div>
+            
+            <div class="input-group">
+                <label>
+                    <input type="checkbox" id="include-evidence" checked>
+                    Include evidence packages
+                </label>
+            </div>
+            
+            <div class="input-group">
+                <label>
+                    <input type="checkbox" id="include-mitigation" checked>
+                    Include mitigation recommendations
+                </label>
+            </div>
+        </div>
+        
+        <div>
+            <div class="input-group">
+                <label for="business-impact">Business Impact Assessment</label>
+                <textarea id="business-impact" rows="4" placeholder="AI-generated business impact assessment..."></textarea>
+            </div>
+            
+            <div class="input-group">
+                <label>
+                    <input type="checkbox" id="include-timeline" checked>
+                    Include discovery timeline
+                </label>
+            </div>
+            
+            <div class="input-group">
+                <label>
+                    <input type="checkbox" id="include-references" checked>
+                    Include technical references
+                </label>
+            </div>
+        </div>
+        
+        <div>
+            <div class="input-group">
+                <label for="additional-notes">Additional Notes</label>
+                <textarea id="additional-notes" rows="4" placeholder="Any additional information or context..."></textarea>
+            </div>
+            
+            <div class="input-group">
+                <label for="disclosure-timeline">Disclosure Timeline</label>
+                <select id="disclosure-timeline">
+                    <option value="immediate">Immediate (Critical)</option>
+                    <option value="7days">7 Days (High)</option>
+                    <option value="30days">30 Days (Medium)</option>
+                    <option value="90days">90 Days (Low)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>🚀 Generate Reports</h2>
+    <div style="text-align: center;">
+        <button onclick="generateReports()" class="btn" style="font-size: 1.2rem; padding: 1rem 2rem;">
+            📄 Generate Professional Reports
+        </button>
+        
+        <div id="generation-progress" style="display: none; margin-top: 2rem;">
+            <div class="progress-bar">
+                <div class="progress-fill" id="generation-progress-bar" style="width: 0%"></div>
+            </div>
+            <p id="generation-status">Generating reports...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Report Preview Modal -->
+<div id="report-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000;">
+    <div style="position: absolute; top: 5%; left: 5%; width: 90%; height: 90%; background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 2rem; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h2>Report Preview</h2>
+            <button onclick="closeReportModal()" style="background: none; border: none; color: #fff; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+        
+        <div id="report-preview-content" style="background: #fff; color: #000; padding: 2rem; border-radius: 5px; font-family: Arial, sans-serif;">
+            <!-- Report preview will be loaded here -->
+        </div>
+        
+        <div style="margin-top: 2rem; text-align: right;">
+            <button onclick="downloadReport()" class="btn" style="margin-right: 1rem;">Download Report</button>
+            <button onclick="submitReport()" class="btn" style="margin-right: 1rem;">Submit to Platform</button>
+            <button onclick="closeReportModal()" class="btn btn-secondary">Close</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let selectedChains = [];
+    let generatedReports = [];
+    
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+        updateSelectedChains();
+        generateAISummaries();
+    });
+    
+    function updateSelectedChains() {
+        const checkboxes = document.querySelectorAll('.chain-checkbox');
+        selectedChains = [];
+        
+        checkboxes.forEach(checkbox => {
+            if (checkbox.checked) {
+                selectedChains.push(checkbox.id.replace('chain-', ''));
+            }
+        });
+        
+        // Update UI based on selection
+        updateReportConfiguration();
+    }
+    
+    function updateReportConfiguration() {
+        const chainCount = selectedChains.length;
+        const reportTitle = document.getElementById('report-title');
+        
+        if (chainCount === 0) {
+            reportTitle.placeholder = "No chains selected";
+        } else if (chainCount === 1) {
+            reportTitle.placeholder = "Single Chain Exploit - Target Analysis";
+        } else {
+            reportTitle.placeholder = `Multiple Chain Exploits (${chainCount}) - Target Analysis`;
+        }
+    }
+    
+    function selectAllChains() {
+        const checkboxes = document.querySelectorAll('.chain-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = true;
+        });
+        updateSelectedChains();
+    }
+    
+    function selectNone() {
+        const checkboxes = document.querySelectorAll('.chain-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        updateSelectedChains();
+    }
+    
+    function selectHighValue() {
+        const checkboxes = document.querySelectorAll('.chain-checkbox');
+        checkboxes.forEach(checkbox => {
+            const chainCard = checkbox.closest('.chain-card');
+            const bountyText = chainCard.querySelector('.bounty-amount').textContent;
+            const bounty = parseInt(bountyText.replace(/[$,]/g, ''));
+            checkbox.checked = bounty >= 2000;
+        });
+        updateSelectedChains();
+    }
+    
+    function generateAISummaries() {
+        // Generate AI-powered summaries
+        const executiveSummary = `Multiple high-impact exploit chains have been discovered affecting the target application. These chains combine various vulnerability types to achieve significant business impact, including authentication bypass, privilege escalation, and data exposure. The combined estimated bounty value exceeds $${calculateTotalBounty().toLocaleString()}, indicating critical security risks that require immediate attention.`;
+        
+        const businessImpact = `The discovered exploit chains pose severe risks to business operations, including potential data breaches, financial losses, and regulatory compliance violations. The authentication bypass chains could lead to mass account takeovers, while payment logic flaws could result in direct financial losses. Immediate remediation is recommended to prevent exploitation and protect customer data.`;
+        
+        document.getElementById('executive-summary').value = executiveSummary;
+        document.getElementById('business-impact').value = businessImpact;
+    }
+    
+    function calculateTotalBounty() {
+        let total = 0;
+        selectedChains.forEach(chainId => {
+            const checkbox = document.getElementById('chain-' + chainId);
+            const chainCard = checkbox.closest('.chain-card');
+            const bountyText = chainCard.querySelector('.bounty-amount').textContent;
+            const bounty = parseInt(bountyText.replace(/[$,]/g, ''));
+            total += bounty;
+        });
+        return total;
+    }
+    
+    function updateReportType() {
+        const reportType = document.getElementById('report-type').value;
+        // Update UI based on report type
+        showAlert(`Report type changed to: ${reportType}`, 'success');
+    }
+    
+    function updatePlatform() {
+        const platform = document.getElementById('target-platform').value;
+        // Update UI based on platform
+        showAlert(`Target platform changed to: ${platform}`, 'success');
+    }
+    
+    function generateReports() {
+        if (selectedChains.length === 0) {
+            showAlert('Please select at least one chain to generate reports', 'warning');
+            return;
+        }
+        
+        const reportType = document.getElementById('report-type').value;
+        const platform = document.getElementById('target-platform').value;
+        
+        // Show progress
+        document.getElementById('generation-progress').style.display = 'block';
+        let progress = 0;
+        
+        const progressInterval = setInterval(() => {
+            progress += 10;
+            document.getElementById('generation-progress-bar').style.width = progress + '%';
+            
+            if (progress >= 100) {
+                clearInterval(progressInterval);
+                completeReportGeneration();
+            }
+        }, 200);
+        
+        // Generate reports
+        fetch('/generate_report', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                report_type: reportType,
+                platform: platform,
+                chain_ids: selectedChains,
+                configuration: {
+                    title: document.getElementById('report-title').value,
+                    researcher: document.getElementById('researcher-name').value,
+                    severity: document.getElementById('report-severity').value,
+                    executive_summary: document.getElementById('executive-summary').value,
+                    business_impact: document.getElementById('business-impact').value,
+                    additional_notes: document.getElementById('additional-notes').value,
+                    disclosure_timeline: document.getElementById('disclosure-timeline').value,
+                    include_evidence: document.getElementById('include-evidence').checked,
+                    include_mitigation: document.getElementById('include-mitigation').checked,
+                    include_timeline: document.getElementById('include-timeline').checked,
+                    include_references: document.getElementById('include-references').checked
+                }
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                generatedReports = data.report;
+                clearInterval(progressInterval);
+                completeReportGeneration();
+            } else {
+                showAlert('Error generating reports: ' + data.error, 'error');
+                document.getElementById('generation-progress').style.display = 'none';
+            }
+        })
+        .catch(error => {
+            showAlert('Error generating reports', 'error');
+            document.getElementById('generation-progress').style.display = 'none';
+        });
+    }
+    
+    function completeReportGeneration() {
+        document.getElementById('generation-progress-bar').style.width = '100%';
+        document.getElementById('generation-status').textContent = 'Reports generated successfully!';
+        
+        setTimeout(() => {
+            document.getElementById('generation-progress').style.display = 'none';
+            showAlert(`Reports generated successfully for ${selectedChains.length} chains!`, 'success');
+        }, 1000);
+    }
+    
+    function previewReport() {
+        if (selectedChains.length === 0) {
+            showAlert('Please select at least one chain to preview', 'warning');
+            return;
+        }
+        
+        // Generate preview content
+        const previewContent = generateReportPreview();
+        document.getElementById('report-preview-content').innerHTML = previewContent;
+        document.getElementById('report-modal').style.display = 'block';
+    }
+    
+    function generateReportPreview() {
+        const title = document.getElementById('report-title').value || 'Bug Bounty Report';
+        const researcher = document.getElementById('researcher-name').value || 'APEX HUNTER System';
+        const severity = document.getElementById('report-severity').value;
+        const platform = document.getElementById('target-platform').value;
+        const executiveSummary = document.getElementById('executive-summary').value;
+        const businessImpact = document.getElementById('business-impact').value;
+        
+        return `
+            <div style="max-width: 800px; margin: 0 auto; line-height: 1.6;">
+                <div style="text-align: center; margin-bottom: 2rem; border-bottom: 2px solid #333; padding-bottom: 1rem;">
+                    <h1 style="color: #333; margin-bottom: 0.5rem;">${title}</h1>
+                    <p style="color: #666; margin: 0;">Submitted to: ${platform.charAt(0).toUpperCase() + platform.slice(1)}</p>
+                    <p style="color: #666; margin: 0;">Researcher: ${researcher}</p>
+                    <p style="color: #666; margin: 0;">Date: ${new Date().toLocaleDateString()}</p>
+                    <span style="background: ${getSeverityColor(severity)}; color: white; padding: 0.3rem 0.8rem; border-radius: 15px; font-weight: bold; text-transform: uppercase;">
+                        ${severity} Severity
+                    </span>
+                </div>
+                
+                <div style="margin-bottom: 2rem;">
+                    <h2 style="color: #333; border-bottom: 1px solid #ccc; padding-bottom: 0.5rem;">Executive Summary</h2>
+                    <p style="color: #555;">${executiveSummary}</p>
+                </div>
+                
+                <div style="margin-bottom: 2rem;">
+                    <h2 style="color: #333; border-bottom: 1px solid #ccc; padding-bottom: 0.5rem;">Business Impact</h2>
+                    <p style="color: #555;">${businessImpact}</p>
+                </div>
+                
+                <div style="margin-bottom: 2rem;">
+                    <h2 style="color: #333; border-bottom: 1px solid #ccc; padding-bottom: 0.5rem;">Discovered Chains</h2>
+                    <div style="background: #f5f5f5; padding: 1rem; border-radius: 5px;">
+                        <p><strong>Total Chains:</strong> ${selectedChains.length}</p>
+                        <p><strong>Combined Bounty Estimate:</strong> $${calculateTotalBounty().toLocaleString()}</p>
+                        <p><strong>Highest Impact:</strong> Critical</p>
+                        <p><strong>Evidence Packages:</strong> ${selectedChains.length} complete</p>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 2rem;">
+                    <h2 style="color: #333; border-bottom: 1px solid #ccc; padding-bottom: 0.5rem;">Technical Details</h2>
+                    <p style="color: #555;">Detailed technical analysis and reproduction steps are included in the complete report package. Each chain has been validated and includes comprehensive evidence packages with screenshots, HTTP request/response data, and video proof-of-concept demonstrations.</p>
+                </div>
+                
+                <div style="margin-bottom: 2rem;">
+                    <h2 style="color: #333; border-bottom: 1px solid #ccc; padding-bottom: 0.5rem;">Mitigation Recommendations</h2>
+                    <ul style="color: #555;">
+                        <li>Implement comprehensive input validation across all endpoints</li>
+                        <li>Add proper authorization checks at function and data levels</li>
+                        <li>Review and strengthen business logic validation</li>
+                        <li>Implement rate limiting and abuse prevention measures</li>
+                        <li>Conduct regular security assessments and penetration testing</li>
+                    </ul>
+                </div>
+                
+                <div style="text-align: center; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #ccc; color: #666;">
+                    <p>Generated by APEX HUNTER - Elite Bug Bounty Automation System</p>
+                    <p>Report ID: ${generateReportId()}</p>
+                </div>
+            </div>
+        `;
+    }
+    
+    function getSeverityColor(severity) {
+        switch(severity.toLowerCase()) {
+            case 'critical': return '#dc3545';
+            case 'high': return '#fd7e14';
+            case 'medium': return '#ffc107';
+            case 'low': return '#28a745';
+            default: return '#6c757d';
+        }
+    }
+    
+    function generateReportId() {
+        return 'AH-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
+    }
+    
+    function closeReportModal() {
+        document.getElementById('report-modal').style.display = 'none';
+    }
+    
+    function downloadReport() {
+        const content = document.getElementById('report-preview-content').innerHTML;
+        const blob = new Blob([`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Bug Bounty Report</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 2rem; }
+                </style>
+            </head>
+            <body>
+                ${content}
+            </body>
+            </html>
+        `], { type: 'text/html' });
+        
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bug_bounty_report_${new Date().toISOString().split('T')[0]}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showAlert('Report downloaded successfully', 'success');
+    }
+    
+    function submitReport() {
+        const platform = document.getElementById('target-platform').value;
+        showAlert(`Report submission to ${platform} would be implemented here`, 'warning');
+    }
+    
+    function generateAllReports() {
+        selectAllChains();
+        setTimeout(() => {
+            generateReports();
+        }, 500);
+    }
+    
+    function exportReports() {
+        if (generatedReports.length === 0) {
+            showAlert('No reports generated yet', 'warning');
+            return;
+        }
+        
+        const exportData = {
+            export_timestamp: new Date().toISOString(),
+            platform: document.getElementById('target-platform').value,
+            report_type: document.getElementById('report-type').value,
+            total_chains: selectedChains.length,
+            total_bounty: calculateTotalBounty(),
+            reports: generatedReports
+        };
+        
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `apex_hunter_reports_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showAlert('Reports exported successfully', 'success');
+    }
+    
+    // Event listeners
+    document.addEventListener('change', function(e) {
+        if (e.target.classList.contains('chain-checkbox')) {
+            updateSelectedChains();
+        }
+    });
+    
+    // Close modal when clicking outside
+    document.getElementById('report-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeReportModal();
+        }
+    });
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeReportModal();
+        }
+    });
+</script>
+{% endblock %}

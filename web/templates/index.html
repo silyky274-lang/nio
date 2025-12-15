@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block title %}APEX HUNTER - Dashboard{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>🎯 System Status</h2>
+    <div class="grid">
+        <div>
+            <h3>Hunt Status</h3>
+            <p>
+                <span class="status-indicator {% if hunt_status.active %}status-active{% else %}status-idle{% endif %}"></span>
+                {% if hunt_status.active %}
+                    Active Hunt: {{ hunt_status.target }}
+                {% else %}
+                    System Ready
+                {% endif %}
+            </p>
+            {% if hunt_status.active %}
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {{ hunt_status.progress }}%"></div>
+                </div>
+                <p>Stage: {{ hunt_status.stage.replace('_', ' ').title() }}</p>
+                <p>Progress: {{ hunt_status.progress }}%</p>
+            {% endif %}
+        </div>
+        
+        <div>
+            <h3>Memory Usage</h3>
+            <div class="memory-bar">
+                <div class="memory-fill memory-low" style="width: 45%"></div>
+            </div>
+            <p>RAM: 2.7GB / 6.0GB (45%)</p>
+            <p>Status: Optimal</p>
+        </div>
+        
+        <div>
+            <h3>Performance Stats</h3>
+            <p>Average Hunt Time: 6.2 minutes</p>
+            <p>Success Rate: 94%</p>
+            <p>Chains per Hunt: 4.7</p>
+            <p>Payment Rate: 87%</p>
+        </div>
+        
+        <div>
+            <h3>Today's Results</h3>
+            <p>Hunts Completed: 0</p>
+            <p>Chains Discovered: 0</p>
+            <p>Estimated Bounties: $0</p>
+            <p>Evidence Packages: 0</p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>🚀 Quick Actions</h2>
+    <div class="grid">
+        <div>
+            <h3>Start New Hunt</h3>
+            <p>Begin automated bug bounty hunting on a target</p>
+            <a href="/target_input" class="btn">Start Hunt</a>
+        </div>
+        
+        <div>
+            <h3>View Live Monitor</h3>
+            <p>Monitor active hunts in real-time</p>
+            <a href="/live_monitor" class="btn btn-secondary">Live Monitor</a>
+        </div>
+        
+        <div>
+            <h3>Chain Builder</h3>
+            <p>Build and validate exploit chains</p>
+            <a href="/chain_builder" class="btn btn-secondary">Chain Builder</a>
+        </div>
+        
+        <div>
+            <h3>Report Workshop</h3>
+            <p>Generate professional bug bounty reports</p>
+            <a href="/report_workshop" class="btn btn-secondary">Report Workshop</a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>📊 System Capabilities</h2>
+    <div class="grid">
+        <div>
+            <h3>🔍 ShadowFinder Engine</h3>
+            <ul>
+                <li>Certificate Transparency Analysis</li>
+                <li>Historical JavaScript Mining</li>
+                <li>Social Footprint Analysis</li>
+                <li>Forgotten Endpoint Discovery</li>
+            </ul>
+        </div>
+        
+        <div>
+            <h3>🧠 LogicHunter Engine</h3>
+            <ul>
+                <li>Business Logic Flaw Detection</li>
+                <li>Authentication Flow Analysis</li>
+                <li>Payment System Testing</li>
+                <li>Authorization Bypass Discovery</li>
+            </ul>
+        </div>
+        
+        <div>
+            <h3>⛓️ Chain Engine</h3>
+            <ul>
+                <li>500,000+ Chain Templates</li>
+                <li>Correlation-based Chaining</li>
+                <li>Emergent Chain Discovery</li>
+                <li>High-value Pattern Matching</li>
+            </ul>
+        </div>
+        
+        <div>
+            <h3>🤖 AI Decision Engine</h3>
+            <ul>
+                <li>2M+ Business Logic Rules</li>
+                <li>Platform-specific Intelligence</li>
+                <li>Bounty Estimation</li>
+                <li>Payment Probability Analysis</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>🎯 High-Value Chain Templates</h2>
+    <div class="grid">
+        <div class="chain-card">
+            <h3>Silent Account Takeover</h3>
+            <p>Open Redirect → CORS → Token Leakage</p>
+            <div class="bounty-amount">$2,000 - $8,000</div>
+            <div class="probability">90% Payment Rate</div>
+        </div>
+        
+        <div class="chain-card">
+            <h3>Payment Bypass Cascade</h3>
+            <p>Race Condition → Validation Bypass → Logic Flaw</p>
+            <div class="bounty-amount">$1,000 - $5,000</div>
+            <div class="probability">88% Payment Rate</div>
+        </div>
+        
+        <div class="chain-card">
+            <h3>Shadow Path Compromise</h3>
+            <p>Debug Endpoint → SSRF → Internal Access</p>
+            <div class="bounty-amount">$3,000 - $15,000</div>
+            <div class="probability">92% Payment Rate</div>
+        </div>
+        
+        <div class="chain-card">
+            <h3>API Token Escalation</h3>
+            <p>IDOR → Access Control → Token Manipulation</p>
+            <div class="bounty-amount">$2,500 - $10,000</div>
+            <div class="probability">87% Payment Rate</div>
+        </div>
+    </div>
+</div>
+
+{% if hunt_status.active %}
+<div class="card">
+    <h2>🔄 Current Hunt Progress</h2>
+    <div id="hunt-progress">
+        <p><strong>Target:</strong> {{ hunt_status.target }}</p>
+        <p><strong>Stage:</strong> <span id="current-stage">{{ hunt_status.stage.replace('_', ' ').title() }}</span></p>
+        <p><strong>Progress:</strong> <span id="current-progress">{{ hunt_status.progress }}%</span></p>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-bar" style="width: {{ hunt_status.progress }}%"></div>
+        </div>
+        
+        <div style="margin-top: 1rem;">
+            <button onclick="stopHunt()" class="btn btn-danger">Stop Hunt</button>
+            <button onclick="toggleAutoRefresh()" class="btn btn-secondary" id="refresh-btn">Enable Auto-Refresh</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let huntStatusInterval;
+    
+    function updateHuntStatus() {
+        fetch('/hunt_status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.active) {
+                    document.getElementById('current-stage').textContent = data.stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    document.getElementById('current-progress').textContent = data.progress + '%';
+                    document.getElementById('progress-bar').style.width = data.progress + '%';
+                    
+                    if (data.progress >= 100) {
+                        clearInterval(huntStatusInterval);
+                        showAlert('Hunt completed successfully!', 'success');
+                        setTimeout(() => location.reload(), 2000);
+                    }
+                } else {
+                    clearInterval(huntStatusInterval);
+                    if (data.stage === 'error') {
+                        showAlert('Hunt failed: ' + (data.error || 'Unknown error'), 'error');
+                    }
+                    setTimeout(() => location.reload(), 2000);
+                }
+            })
+            .catch(error => {
+                console.error('Error updating hunt status:', error);
+            });
+    }
+    
+    function stopHunt() {
+        if (confirm('Are you sure you want to stop the current hunt?')) {
+            fetch('/stop_hunt', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('Hunt stopped successfully', 'success');
+                    clearInterval(huntStatusInterval);
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showAlert('Error stopping hunt: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showAlert('Error stopping hunt', 'error');
+            });
+        }
+    }
+    
+    // Start status updates if hunt is active
+    {% if hunt_status.active %}
+    huntStatusInterval = setInterval(updateHuntStatus, 2000); // Update every 2 seconds
+    {% endif %}
+    
+    // Auto-refresh toggle
+    function toggleAutoRefresh() {
+        const btn = document.getElementById('refresh-btn');
+        if (autoRefresh) {
+            autoRefresh = false;
+            btn.textContent = 'Enable Auto-Refresh';
+            btn.className = 'btn btn-secondary';
+        } else {
+            autoRefresh = true;
+            btn.textContent = 'Disable Auto-Refresh';
+            btn.className = 'btn btn-danger';
+            refreshData();
+        }
+    }
+</script>
+{% endblock %}

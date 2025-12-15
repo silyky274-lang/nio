@@ -1,0 +1,446 @@
+{% extends "base.html" %}
+
+{% block title %}APEX HUNTER - Chain Builder{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>⛓️ Chain Exploit Builder</h2>
+    <p>Build, validate, and analyze exploit chains discovered by APEX HUNTER.</p>
+    
+    <div class="grid">
+        <div>
+            <h3>Chain Statistics</h3>
+            <p><strong>Total Chains:</strong> <span id="total-chains">{{ chains|length }}</span></p>
+            <p><strong>High Value:</strong> <span id="high-value-chains">0</span></p>
+            <p><strong>Validated:</strong> <span id="validated-chains">0</span></p>
+            <p><strong>Total Bounty:</strong> <span id="total-bounty">$0</span></p>
+        </div>
+        
+        <div>
+            <h3>Quick Actions</h3>
+            <button onclick="validateAllChains()" class="btn">Validate All Chains</button>
+            <button onclick="exportChains()" class="btn btn-secondary">Export Chains</button>
+            <button onclick="refreshChains()" class="btn btn-secondary">Refresh</button>
+        </div>
+        
+        <div>
+            <h3>Filters</h3>
+            <select id="chain-filter" onchange="filterChains()">
+                <option value="all">All Chains</option>
+                <option value="high-value">High Value ($2000+)</option>
+                <option value="critical">Critical Impact</option>
+                <option value="template">Template-based</option>
+                <option value="emergent">Emergent</option>
+            </select>
+        </div>
+        
+        <div>
+            <h3>Sort By</h3>
+            <select id="chain-sort" onchange="sortChains()">
+                <option value="bounty">Estimated Bounty</option>
+                <option value="probability">Payment Probability</option>
+                <option value="impact">Business Impact</option>
+                <option value="confidence">Confidence Score</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div id="chains-container">
+    {% if chains %}
+        <div class="grid" id="chains-grid">
+            {% for chain in chains %}
+            <div class="chain-card" data-chain-id="{{ chain.chain_id }}" data-bounty="{{ chain.estimated_bounty or 500 }}" data-probability="{{ chain.payment_probability or 0.8 }}" data-impact="{{ chain.business_impact or 7.0 }}">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                    <h3>{{ chain.name or 'Unknown Chain' }}</h3>
+                    <span class="status-indicator status-idle" id="status-{{ chain.chain_id }}"></span>
+                </div>
+                
+                <p><strong>Type:</strong> {{ chain.chain_type or 'chain_exploit' }}</p>
+                <p><strong>Components:</strong> {{ chain.components|length if chain.components else 0 }}</p>
+                
+                <div class="bounty-amount">${{ "{:,}".format(chain.estimated_bounty or 500) }}</div>
+                <div class="probability">{{ "{:.0%}".format(chain.payment_probability or 0.8) }} Payment Rate</div>
+                
+                <div style="margin: 1rem 0;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span>Business Impact:</span>
+                        <span>{{ "%.1f"|format(chain.business_impact or 7.0) }}/10.0</span>
+                    </div>
+                    <div class="progress-bar" style="height: 8px;">
+                        <div class="progress-fill" style="width: {{ (chain.business_impact or 7.0) * 10 }}%"></div>
+                    </div>
+                </div>
+                
+                <div style="margin: 1rem 0;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span>Confidence:</span>
+                        <span>{{ "{:.0%}".format(chain.confidence_score or 0.8) }}</span>
+                    </div>
+                    <div class="progress-bar" style="height: 8px;">
+                        <div class="progress-fill" style="width: {{ (chain.confidence_score or 0.8) * 100 }}%"></div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 1rem;">
+                    <button onclick="validateChain('{{ chain.chain_id }}')" class="btn" style="margin-right: 0.5rem;">Validate</button>
+                    <button onclick="viewChainDetails('{{ chain.chain_id }}')" class="btn btn-secondary">Details</button>
+                </div>
+                
+                {% if chain.platforms %}
+                <div style="margin-top: 1rem;">
+                    <strong>Platforms:</strong>
+                    {% for platform in chain.platforms %}
+                        <span style="background: #333; padding: 0.2rem 0.5rem; border-radius: 3px; margin-right: 0.5rem; font-size: 0.8rem;">{{ platform }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card">
+            <h3>No Chains Available</h3>
+            <p>No exploit chains have been discovered yet. Start a hunt to discover chain opportunities.</p>
+            <a href="/target_input" class="btn">Start New Hunt</a>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Chain Details Modal -->
+<div id="chain-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 2rem; max-width: 800px; max-height: 80vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h2 id="modal-title">Chain Details</h2>
+            <button onclick="closeModal()" style="background: none; border: none; color: #fff; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+        
+        <div id="modal-content">
+            <!-- Chain details will be loaded here -->
+        </div>
+        
+        <div style="margin-top: 2rem; text-align: right;">
+            <button onclick="generateReport()" class="btn" style="margin-right: 1rem;">Generate Report</button>
+            <button onclick="closeModal()" class="btn btn-secondary">Close</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentChains = {{ chains|tojson if chains else '[]' }};
+    let selectedChainId = null;
+    
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+        updateStatistics();
+        refreshChains();
+    });
+    
+    function updateStatistics() {
+        const totalChains = currentChains.length;
+        const highValueChains = currentChains.filter(chain => (chain.estimated_bounty || 500) >= 2000).length;
+        const totalBounty = currentChains.reduce((sum, chain) => sum + (chain.estimated_bounty || 500), 0);
+        
+        document.getElementById('total-chains').textContent = totalChains;
+        document.getElementById('high-value-chains').textContent = highValueChains;
+        document.getElementById('total-bounty').textContent = '$' + totalBounty.toLocaleString();
+    }
+    
+    function validateChain(chainId) {
+        const statusIndicator = document.getElementById('status-' + chainId);
+        statusIndicator.className = 'status-indicator status-active';
+        
+        fetch('/validate_chain', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ chain_id: chainId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.valid) {
+                statusIndicator.className = 'status-indicator status-active';
+                showAlert(`Chain ${chainId} validated! Confidence: ${Math.round(data.confidence_score * 100)}%`, 'success');
+                
+                // Update validated count
+                const validatedCount = document.querySelectorAll('.status-active').length;
+                document.getElementById('validated-chains').textContent = validatedCount;
+            } else {
+                statusIndicator.className = 'status-indicator status-error';
+                showAlert('Chain validation failed', 'error');
+            }
+        })
+        .catch(error => {
+            statusIndicator.className = 'status-indicator status-error';
+            showAlert('Error validating chain', 'error');
+        });
+    }
+    
+    function validateAllChains() {
+        if (currentChains.length === 0) {
+            showAlert('No chains to validate', 'warning');
+            return;
+        }
+        
+        if (confirm(`Validate all ${currentChains.length} chains? This may take a few minutes.`)) {
+            let validatedCount = 0;
+            const totalChains = currentChains.length;
+            
+            currentChains.forEach((chain, index) => {
+                setTimeout(() => {
+                    validateChain(chain.chain_id);
+                    validatedCount++;
+                    
+                    if (validatedCount === totalChains) {
+                        showAlert('All chains validated!', 'success');
+                    }
+                }, index * 1000); // Stagger validation requests
+            });
+        }
+    }
+    
+    function viewChainDetails(chainId) {
+        selectedChainId = chainId;
+        const chain = currentChains.find(c => c.chain_id === chainId);
+        
+        if (!chain) {
+            showAlert('Chain not found', 'error');
+            return;
+        }
+        
+        document.getElementById('modal-title').textContent = chain.name || 'Chain Details';
+        
+        let modalContent = `
+            <div class="grid">
+                <div>
+                    <h3>Basic Information</h3>
+                    <p><strong>Chain ID:</strong> ${chain.chain_id}</p>
+                    <p><strong>Type:</strong> ${chain.chain_type || 'chain_exploit'}</p>
+                    <p><strong>Estimated Bounty:</strong> $${(chain.estimated_bounty || 500).toLocaleString()}</p>
+                    <p><strong>Payment Probability:</strong> ${Math.round((chain.payment_probability || 0.8) * 100)}%</p>
+                    <p><strong>Business Impact:</strong> ${(chain.business_impact || 7.0).toFixed(1)}/10.0</p>
+                    <p><strong>Confidence Score:</strong> ${Math.round((chain.confidence_score || 0.8) * 100)}%</p>
+                </div>
+                
+                <div>
+                    <h3>Target Platforms</h3>
+                    ${chain.platforms ? chain.platforms.map(p => `<span style="background: #333; padding: 0.3rem 0.6rem; border-radius: 3px; margin-right: 0.5rem;">${p}</span>`).join('') : 'Not specified'}
+                    
+                    <h3 style="margin-top: 1rem;">Priority</h3>
+                    <span style="background: ${getPriorityColor(chain.priority || 'medium')}; color: #000; padding: 0.3rem 0.6rem; border-radius: 3px; font-weight: bold;">
+                        ${(chain.priority || 'medium').toUpperCase()}
+                    </span>
+                </div>
+            </div>
+            
+            <div style="margin-top: 2rem;">
+                <h3>Chain Components</h3>
+                <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 5px;">
+        `;
+        
+        if (chain.components && chain.components.length > 0) {
+            chain.components.forEach((component, index) => {
+                modalContent += `
+                    <div style="margin-bottom: 1rem; padding: 1rem; background: rgba(0,255,65,0.1); border-left: 3px solid #00ff41; border-radius: 3px;">
+                        <h4>Step ${index + 1}: ${component.component_type ? component.component_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Unknown'}</h4>
+                        ${component.findings ? `<p><strong>Findings:</strong> ${component.findings.length}</p>` : ''}
+                        ${component.findings && component.findings[0] ? `<p><strong>Description:</strong> ${component.findings[0].description || 'No description'}</p>` : ''}
+                    </div>
+                `;
+            });
+        } else {
+            modalContent += '<p>No component details available</p>';
+        }
+        
+        modalContent += `
+                </div>
+            </div>
+            
+            <div style="margin-top: 2rem;">
+                <h3>Attack Flow</h3>
+                <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 5px;">
+        `;
+        
+        if (chain.attack_flow && chain.attack_flow.length > 0) {
+            chain.attack_flow.forEach((step, index) => {
+                modalContent += `<p><strong>${index + 1}.</strong> ${step}</p>`;
+            });
+        } else {
+            modalContent += '<p>No attack flow details available</p>';
+        }
+        
+        modalContent += `
+                </div>
+            </div>
+            
+            <div style="margin-top: 2rem;">
+                <h3>Evidence Requirements</h3>
+                <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 5px;">
+        `;
+        
+        if (chain.evidence_requirements && chain.evidence_requirements.length > 0) {
+            chain.evidence_requirements.forEach(req => {
+                modalContent += `<span style="background: #333; padding: 0.3rem 0.6rem; border-radius: 3px; margin-right: 0.5rem; margin-bottom: 0.5rem; display: inline-block;">${req.replace('_', ' ')}</span>`;
+            });
+        } else {
+            modalContent += '<p>Standard evidence requirements apply</p>';
+        }
+        
+        modalContent += '</div></div>';
+        
+        document.getElementById('modal-content').innerHTML = modalContent;
+        document.getElementById('chain-modal').style.display = 'block';
+    }
+    
+    function closeModal() {
+        document.getElementById('chain-modal').style.display = 'none';
+        selectedChainId = null;
+    }
+    
+    function generateReport() {
+        if (!selectedChainId) {
+            showAlert('No chain selected', 'error');
+            return;
+        }
+        
+        // Redirect to report workshop with selected chain
+        window.location.href = `/report_workshop?chain_id=${selectedChainId}`;
+    }
+    
+    function getPriorityColor(priority) {
+        switch(priority.toLowerCase()) {
+            case 'critical': return '#ff4444';
+            case 'high': return '#ff8800';
+            case 'medium': return '#ffaa00';
+            case 'low': return '#00ff41';
+            default: return '#666';
+        }
+    }
+    
+    function filterChains() {
+        const filter = document.getElementById('chain-filter').value;
+        const chainCards = document.querySelectorAll('.chain-card');
+        
+        chainCards.forEach(card => {
+            const bounty = parseInt(card.dataset.bounty);
+            const impact = parseFloat(card.dataset.impact);
+            let show = true;
+            
+            switch(filter) {
+                case 'high-value':
+                    show = bounty >= 2000;
+                    break;
+                case 'critical':
+                    show = impact >= 9.0;
+                    break;
+                case 'template':
+                    show = card.textContent.includes('template');
+                    break;
+                case 'emergent':
+                    show = card.textContent.includes('emergent');
+                    break;
+                default:
+                    show = true;
+            }
+            
+            card.style.display = show ? 'block' : 'none';
+        });
+    }
+    
+    function sortChains() {
+        const sortBy = document.getElementById('chain-sort').value;
+        const grid = document.getElementById('chains-grid');
+        const cards = Array.from(grid.children);
+        
+        cards.sort((a, b) => {
+            let aValue, bValue;
+            
+            switch(sortBy) {
+                case 'bounty':
+                    aValue = parseInt(a.dataset.bounty);
+                    bValue = parseInt(b.dataset.bounty);
+                    break;
+                case 'probability':
+                    aValue = parseFloat(a.dataset.probability);
+                    bValue = parseFloat(b.dataset.probability);
+                    break;
+                case 'impact':
+                    aValue = parseFloat(a.dataset.impact);
+                    bValue = parseFloat(b.dataset.impact);
+                    break;
+                case 'confidence':
+                    aValue = parseFloat(a.dataset.confidence || '0.8');
+                    bValue = parseFloat(b.dataset.confidence || '0.8');
+                    break;
+                default:
+                    return 0;
+            }
+            
+            return bValue - aValue; // Descending order
+        });
+        
+        // Re-append sorted cards
+        cards.forEach(card => grid.appendChild(card));
+    }
+    
+    function exportChains() {
+        if (currentChains.length === 0) {
+            showAlert('No chains to export', 'warning');
+            return;
+        }
+        
+        const exportData = {
+            export_timestamp: new Date().toISOString(),
+            total_chains: currentChains.length,
+            chains: currentChains
+        };
+        
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `apex_hunter_chains_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showAlert('Chains exported successfully', 'success');
+    }
+    
+    function refreshChains() {
+        fetch('/api/chains')
+            .then(response => response.json())
+            .then(data => {
+                currentChains = data.chains || [];
+                updateStatistics();
+                
+                if (currentChains.length > 0) {
+                    // Reload page to update chain display
+                    location.reload();
+                }
+            })
+            .catch(error => {
+                showAlert('Error refreshing chains', 'error');
+            });
+    }
+    
+    // Close modal when clicking outside
+    document.getElementById('chain-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeModal();
+        }
+    });
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeModal();
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,451 @@
+{% extends "base.html" %}
+
+{% block title %}APEX HUNTER - Live Monitor{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>📊 Live Analysis Monitor</h2>
+    <div class="grid">
+        <div>
+            <h3>Hunt Status</h3>
+            <p id="hunt-status">
+                <span class="status-indicator status-idle" id="status-indicator"></span>
+                <span id="status-text">System Ready</span>
+            </p>
+            <p><strong>Target:</strong> <span id="current-target">None</span></p>
+            <p><strong>Stage:</strong> <span id="current-stage">Idle</span></p>
+            <p><strong>Elapsed:</strong> <span id="elapsed-time">0:00</span></p>
+            <p><strong>Remaining:</strong> <span id="remaining-time">8:00</span></p>
+        </div>
+        
+        <div>
+            <h3>Memory Usage</h3>
+            <div class="memory-bar">
+                <div class="memory-fill memory-low" id="memory-bar" style="width: 45%"></div>
+            </div>
+            <p id="memory-text">RAM: 2.7GB / 6.0GB (45%)</p>
+            <p id="memory-status">Status: Optimal</p>
+            <p><strong>Loaded Tools:</strong> <span id="loaded-tools">None</span></p>
+        </div>
+        
+        <div>
+            <h3>Progress</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-bar" style="width: 0%"></div>
+            </div>
+            <p><strong>Overall:</strong> <span id="progress-text">0%</span></p>
+            <p><strong>Findings:</strong> <span id="findings-count">0</span></p>
+            <p><strong>Chains:</strong> <span id="chains-count">0</span></p>
+        </div>
+        
+        <div>
+            <h3>Controls</h3>
+            <button onclick="toggleAutoRefresh()" class="btn btn-secondary" id="refresh-btn">Enable Auto-Refresh</button>
+            <button onclick="stopHunt()" class="btn btn-danger" id="stop-btn" disabled>Stop Hunt</button>
+            <button onclick="exportLogs()" class="btn btn-secondary">Export Logs</button>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>🔍 Live Findings Feed</h2>
+    <div id="findings-feed" style="max-height: 400px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 5px;">
+        <p style="color: #666; text-align: center;">No active hunt - findings will appear here during analysis</p>
+    </div>
+</div>
+
+<div class="card">
+    <h2>⛓️ Chain Opportunities</h2>
+    <div id="chains-container">
+        <p style="color: #666; text-align: center;">Chain opportunities will appear here as they are discovered</p>
+    </div>
+</div>
+
+<div class="card">
+    <h2>🧠 AI Analysis Status</h2>
+    <div class="grid">
+        <div>
+            <h3>Knowledge Base</h3>
+            <p><strong>Chain Templates:</strong> <span id="kb-chains">10,010</span></p>
+            <p><strong>Business Rules:</strong> <span id="kb-rules">50,030</span></p>
+            <p><strong>Vulnerabilities:</strong> <span id="kb-vulns">10,000</span></p>
+            <p><strong>Status:</strong> <span id="kb-status">Ready</span></p>
+        </div>
+        
+        <div>
+            <h3>Analysis Engines</h3>
+            <p><strong>ShadowFinder:</strong> <span id="shadow-status">Idle</span></p>
+            <p><strong>LogicHunter:</strong> <span id="logic-status">Idle</span></p>
+            <p><strong>ChainEngine:</strong> <span id="chain-status">Idle</span></p>
+            <p><strong>AI Engine:</strong> <span id="ai-status">Idle</span></p>
+        </div>
+        
+        <div>
+            <h3>Performance Metrics</h3>
+            <p><strong>Findings/Min:</strong> <span id="findings-rate">0</span></p>
+            <p><strong>Chain Rate:</strong> <span id="chain-rate">0</span></p>
+            <p><strong>Success Rate:</strong> <span id="success-rate">0%</span></p>
+            <p><strong>Avg Bounty:</strong> <span id="avg-bounty">$0</span></p>
+        </div>
+        
+        <div>
+            <h3>System Health</h3>
+            <p><strong>CPU Usage:</strong> <span id="cpu-usage">15%</span></p>
+            <p><strong>Disk I/O:</strong> <span id="disk-io">Low</span></p>
+            <p><strong>Network:</strong> <span id="network-status">Active</span></p>
+            <p><strong>Errors:</strong> <span id="error-count">0</span></p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>📈 Real-time Charts</h2>
+    <div class="grid">
+        <div>
+            <h3>Findings Over Time</h3>
+            <canvas id="findings-chart" width="300" height="150" style="background: rgba(0,0,0,0.3); border-radius: 5px;"></canvas>
+        </div>
+        
+        <div>
+            <h3>Memory Usage</h3>
+            <canvas id="memory-chart" width="300" height="150" style="background: rgba(0,0,0,0.3); border-radius: 5px;"></canvas>
+        </div>
+        
+        <div>
+            <h3>Chain Discovery Rate</h3>
+            <canvas id="chain-chart" width="300" height="150" style="background: rgba(0,0,0,0.3); border-radius: 5px;"></canvas>
+        </div>
+        
+        <div>
+            <h3>Bounty Estimates</h3>
+            <canvas id="bounty-chart" width="300" height="150" style="background: rgba(0,0,0,0.3); border-radius: 5px;"></canvas>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let autoRefresh = false;
+    let refreshInterval;
+    let huntStartTime = null;
+    let findingsData = [];
+    let memoryData = [];
+    let chainData = [];
+    let bountyData = [];
+    
+    function toggleAutoRefresh() {
+        const btn = document.getElementById('refresh-btn');
+        if (autoRefresh) {
+            autoRefresh = false;
+            clearInterval(refreshInterval);
+            btn.textContent = 'Enable Auto-Refresh';
+            btn.className = 'btn btn-secondary';
+        } else {
+            autoRefresh = true;
+            btn.textContent = 'Disable Auto-Refresh';
+            btn.className = 'btn btn-danger';
+            refreshInterval = setInterval(updateStatus, 2000);
+            updateStatus(); // Initial update
+        }
+    }
+    
+    function updateStatus() {
+        fetch('/hunt_status')
+            .then(response => response.json())
+            .then(data => {
+                updateHuntStatus(data);
+                updateMemoryStatus(data.memory_stats || {});
+                updateFindings();
+                updateChains();
+                updateCharts();
+            })
+            .catch(error => {
+                console.error('Error updating status:', error);
+            });
+    }
+    
+    function updateHuntStatus(data) {
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusText = document.getElementById('status-text');
+        const stopBtn = document.getElementById('stop-btn');
+        
+        if (data.active) {
+            statusIndicator.className = 'status-indicator status-active';
+            statusText.textContent = 'Hunt Active';
+            stopBtn.disabled = false;
+            
+            if (!huntStartTime) {
+                huntStartTime = Date.now() - (data.elapsed_time || 0) * 1000;
+            }
+        } else {
+            statusIndicator.className = 'status-indicator status-idle';
+            statusText.textContent = 'System Ready';
+            stopBtn.disabled = true;
+            huntStartTime = null;
+        }
+        
+        document.getElementById('current-target').textContent = data.target || 'None';
+        document.getElementById('current-stage').textContent = (data.stage || 'idle').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        document.getElementById('progress-bar').style.width = (data.progress || 0) + '%';
+        document.getElementById('progress-text').textContent = (data.progress || 0) + '%';
+        
+        // Update time
+        if (data.active && huntStartTime) {
+            const elapsed = Math.floor((Date.now() - huntStartTime) / 1000);
+            const remaining = Math.max(0, 480 - elapsed);
+            document.getElementById('elapsed-time').textContent = formatTime(elapsed);
+            document.getElementById('remaining-time').textContent = formatTime(remaining);
+        } else {
+            document.getElementById('elapsed-time').textContent = '0:00';
+            document.getElementById('remaining-time').textContent = '8:00';
+        }
+        
+        // Update engine status
+        const stage = data.stage || 'idle';
+        document.getElementById('shadow-status').textContent = stage === 'shadow_analysis' ? 'Active' : 'Idle';
+        document.getElementById('logic-status').textContent = stage === 'logic_analysis' ? 'Active' : 'Idle';
+        document.getElementById('chain-status').textContent = stage === 'chain_analysis' ? 'Active' : 'Idle';
+        document.getElementById('ai-status').textContent = stage === 'ai_analysis' ? 'Active' : 'Idle';
+    }
+    
+    function updateMemoryStatus(memoryStats) {
+        const currentUsage = memoryStats.current_usage_mb || 2700;
+        const maxRam = 6000;
+        const percentage = Math.round((currentUsage / maxRam) * 100);
+        
+        document.getElementById('memory-bar').style.width = percentage + '%';
+        document.getElementById('memory-text').textContent = `RAM: ${(currentUsage/1000).toFixed(1)}GB / 6.0GB (${percentage}%)`;
+        
+        // Update memory bar color
+        const memoryBar = document.getElementById('memory-bar');
+        if (percentage < 60) {
+            memoryBar.className = 'memory-fill memory-low';
+            document.getElementById('memory-status').textContent = 'Status: Optimal';
+        } else if (percentage < 80) {
+            memoryBar.className = 'memory-fill memory-medium';
+            document.getElementById('memory-status').textContent = 'Status: Moderate';
+        } else {
+            memoryBar.className = 'memory-fill memory-high';
+            document.getElementById('memory-status').textContent = 'Status: High Usage';
+        }
+        
+        // Update loaded tools
+        const loadedTools = memoryStats.loaded_tools || [];
+        document.getElementById('loaded-tools').textContent = loadedTools.length > 0 ? loadedTools.join(', ') : 'None';
+        
+        // Store memory data for chart
+        memoryData.push({
+            time: Date.now(),
+            usage: percentage
+        });
+        if (memoryData.length > 50) memoryData.shift();
+    }
+    
+    function updateFindings() {
+        fetch('/api/findings')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('findings-count').textContent = data.total || 0;
+                
+                // Update findings feed
+                const feed = document.getElementById('findings-feed');
+                if (data.findings && data.findings.length > 0) {
+                    let feedHtml = '';
+                    data.findings.slice(-10).reverse().forEach(finding => {
+                        const timestamp = new Date().toLocaleTimeString();
+                        const type = finding.vulnerability_type || finding.type || 'Unknown';
+                        const description = finding.description || 'No description';
+                        const bounty = finding.bounty_potential || 'medium';
+                        
+                        feedHtml += `
+                            <div style="margin-bottom: 1rem; padding: 0.5rem; background: rgba(0,255,65,0.1); border-left: 3px solid #00ff41; border-radius: 3px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <strong style="color: #00ff41;">${type}</strong>
+                                    <span style="color: #666; font-size: 0.8rem;">${timestamp}</span>
+                                </div>
+                                <div style="margin-top: 0.25rem; color: #ccc;">${description}</div>
+                                <div style="margin-top: 0.25rem;">
+                                    <span style="background: ${getBountyColor(bounty)}; color: #000; padding: 0.2rem 0.5rem; border-radius: 3px; font-size: 0.8rem;">
+                                        ${bounty.toUpperCase()}
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    feed.innerHTML = feedHtml;
+                } else if (data.total === 0) {
+                    feed.innerHTML = '<p style="color: #666; text-align: center;">No findings yet - analysis in progress</p>';
+                }
+                
+                // Store findings data for chart
+                findingsData.push({
+                    time: Date.now(),
+                    count: data.total || 0
+                });
+                if (findingsData.length > 50) findingsData.shift();
+            })
+            .catch(error => {
+                console.error('Error updating findings:', error);
+            });
+    }
+    
+    function updateChains() {
+        fetch('/api/chains')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('chains-count').textContent = data.total || 0;
+                
+                // Update chains container
+                const container = document.getElementById('chains-container');
+                if (data.chains && data.chains.length > 0) {
+                    let chainsHtml = '<div class="grid">';
+                    data.chains.forEach(chain => {
+                        const bounty = chain.estimated_bounty || 500;
+                        const probability = Math.round((chain.payment_probability || 0.8) * 100);
+                        
+                        chainsHtml += `
+                            <div class="chain-card">
+                                <h3>${chain.name || 'Unknown Chain'}</h3>
+                                <p>${chain.chain_type || 'Chain Exploit'}</p>
+                                <div class="bounty-amount">$${bounty.toLocaleString()}</div>
+                                <div class="probability">${probability}% Payment Rate</div>
+                                <button onclick="validateChain('${chain.chain_id}')" class="btn" style="margin-top: 1rem;">Validate</button>
+                            </div>
+                        `;
+                    });
+                    chainsHtml += '</div>';
+                    container.innerHTML = chainsHtml;
+                } else if (data.total === 0) {
+                    container.innerHTML = '<p style="color: #666; text-align: center;">No chains discovered yet</p>';
+                }
+                
+                // Store chain data for chart
+                chainData.push({
+                    time: Date.now(),
+                    count: data.total || 0
+                });
+                if (chainData.length > 50) chainData.shift();
+                
+                // Calculate average bounty
+                if (data.chains && data.chains.length > 0) {
+                    const totalBounty = data.chains.reduce((sum, chain) => sum + (chain.estimated_bounty || 0), 0);
+                    const avgBounty = Math.round(totalBounty / data.chains.length);
+                    document.getElementById('avg-bounty').textContent = '$' + avgBounty.toLocaleString();
+                    
+                    // Store bounty data for chart
+                    bountyData.push({
+                        time: Date.now(),
+                        amount: avgBounty
+                    });
+                    if (bountyData.length > 50) bountyData.shift();
+                }
+            })
+            .catch(error => {
+                console.error('Error updating chains:', error);
+            });
+    }
+    
+    function getBountyColor(bounty) {
+        switch(bounty.toLowerCase()) {
+            case 'critical': return '#ff4444';
+            case 'high': return '#ff8800';
+            case 'medium': return '#ffaa00';
+            case 'low': return '#00ff41';
+            default: return '#666';
+        }
+    }
+    
+    function validateChain(chainId) {
+        fetch('/validate_chain', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ chain_id: chainId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.valid) {
+                showAlert(`Chain validated! Confidence: ${Math.round(data.confidence_score * 100)}%, Bounty: $${data.estimated_bounty}`, 'success');
+            } else {
+                showAlert('Chain validation failed', 'error');
+            }
+        })
+        .catch(error => {
+            showAlert('Error validating chain', 'error');
+        });
+    }
+    
+    function stopHunt() {
+        if (confirm('Are you sure you want to stop the current hunt?')) {
+            fetch('/stop_hunt', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('Hunt stopped successfully', 'success');
+                } else {
+                    showAlert('Error stopping hunt: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showAlert('Error stopping hunt', 'error');
+            });
+        }
+    }
+    
+    function exportLogs() {
+        showAlert('Log export functionality would be implemented here', 'warning');
+    }
+    
+    function updateCharts() {
+        // Simple chart updates (in real implementation, use Chart.js or similar)
+        updateSimpleChart('findings-chart', findingsData, '#00ff41');
+        updateSimpleChart('memory-chart', memoryData, '#ffaa00');
+        updateSimpleChart('chain-chart', chainData, '#ff8800');
+        updateSimpleChart('bounty-chart', bountyData, '#00ff41');
+    }
+    
+    function updateSimpleChart(canvasId, data, color) {
+        const canvas = document.getElementById(canvasId);
+        const ctx = canvas.getContext('2d');
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (data.length < 2) return;
+        
+        // Draw simple line chart
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        
+        const maxValue = Math.max(...data.map(d => d.count || d.usage || d.amount || 0));
+        const minValue = Math.min(...data.map(d => d.count || d.usage || d.amount || 0));
+        const range = maxValue - minValue || 1;
+        
+        data.forEach((point, index) => {
+            const x = (index / (data.length - 1)) * canvas.width;
+            const value = point.count || point.usage || point.amount || 0;
+            const y = canvas.height - ((value - minValue) / range) * canvas.height;
+            
+            if (index === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
+        
+        ctx.stroke();
+    }
+    
+    // Initialize with first update
+    updateStatus();
+</script>
+{% endblock %}
