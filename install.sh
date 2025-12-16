@@ -44,13 +44,25 @@ if ! grep -q "Debian" /etc/os-release && ! grep -q "Ubuntu" /etc/os-release; the
     exit 1
 fi
 
-# Check RAM requirements
+# Check RAM and adjust settings
 TOTAL_RAM=$(free -m | awk 'NR==2{printf "%.0f", $2}')
-if [ "$TOTAL_RAM" -lt 6000 ]; then
-    echo -e "${RED}❌ Insufficient RAM: ${TOTAL_RAM}MB detected${NC}"
-    echo -e "${YELLOW}APEX HUNTER requires at least 6GB RAM${NC}"
-    exit 1
+echo -e "${BLUE}💾 Detected RAM: ${TOTAL_RAM}MB${NC}"
+
+if [ "$TOTAL_RAM" -lt 4000 ]; then
+    echo -e "${YELLOW}⚠️  Low RAM detected. APEX HUNTER will run in lightweight mode${NC}"
+    MEMORY_MODE="lightweight"
+    MAX_RAM=$((TOTAL_RAM - 500))  # Leave 500MB for system
+elif [ "$TOTAL_RAM" -lt 6000 ]; then
+    echo -e "${YELLOW}⚠️  Medium RAM detected. APEX HUNTER will run in optimized mode${NC}"
+    MEMORY_MODE="optimized"
+    MAX_RAM=$((TOTAL_RAM - 800))  # Leave 800MB for system
+else
+    echo -e "${GREEN}✅ Sufficient RAM detected. APEX HUNTER will run in full mode${NC}"
+    MEMORY_MODE="full"
+    MAX_RAM=5500
 fi
+
+echo -e "${CYAN}🔧 Memory mode: ${MEMORY_MODE} (Max RAM: ${MAX_RAM}MB)${NC}"
 
 # Check disk space
 AVAILABLE_DISK=$(df -BG . | awk 'NR==2 {print $4}' | sed 's/G//')
@@ -199,10 +211,10 @@ chmod +x /usr/local/apexhunter/install.sh
 print_step "6" "Building Knowledge Base"
 
 echo -e "${CYAN}Building comprehensive knowledge base...${NC}"
-echo -e "${YELLOW}⚠️  This may take 5-10 minutes on first run...${NC}"
+echo -e "${YELLOW}⚠️  This may take 2-3 minutes on first run...${NC}"
 
 cd /usr/local/apexhunter
-python3 data_collector.py > /dev/null 2>&1
+python3 create_knowledge_base.py
 check_success "Knowledge base construction"
 
 # Verify knowledge base
@@ -218,7 +230,8 @@ echo -e "${CYAN}Creating system configuration...${NC}"
 cat > /usr/local/apexhunter/config/system_config.json << EOF
 {
     "system": {
-        "max_ram_mb": 5500,
+        "max_ram_mb": ${MAX_RAM},
+        "memory_mode": "${MEMORY_MODE}",
         "max_hunt_time_seconds": 480,
         "max_concurrent_hunts": 1,
         "auto_cleanup": true,
