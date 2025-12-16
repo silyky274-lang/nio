@@ -586,10 +586,18 @@ DASHBOARD_TEMPLATE = '''
             <h3>🎯 Start New Hunt</h3>
             <div class="input-group">
                 <input type="text" id="targetInput" placeholder="Enter target domain (e.g., notion.so, example.com)" />
+                <select id="huntMode" style="padding: 12px; background: #2a2a2a; border: 1px solid #444; color: #00ff00; border-radius: 5px; font-family: inherit;">
+                    <option value="standard">Standard Hunt (Fast)</option>
+                    <option value="deep">Deep Analysis (Verified PoCs)</option>
+                </select>
                 <button class="btn" id="startBtn" onclick="startHunt()">Start Hunt</button>
                 <button class="btn" id="stopBtn" onclick="stopHunt()" disabled>Stop Hunt</button>
             </div>
-            <p style="color: #888; font-size: 0.9em;">⚠️ Only test targets you own or have permission to test</p>
+            <div style="margin-top: 10px; font-size: 0.9em;">
+                <div style="color: #00ff00;"><strong>Standard Hunt:</strong> Fast reconnaissance and basic vulnerability detection</div>
+                <div style="color: #ff6600;"><strong>Deep Analysis:</strong> Advanced verification, PoC generation, evidence collection</div>
+            </div>
+            <p style="color: #888; font-size: 0.9em; margin-top: 10px;">⚠️ Only test targets you own or have permission to test</p>
         </div>
         
         <div class="status-grid">
@@ -651,9 +659,25 @@ DASHBOARD_TEMPLATE = '''
         
         function startHunt() {
             const target = document.getElementById('targetInput').value.trim();
+            const mode = document.getElementById('huntMode').value;
+            
             if (!target) {
                 alert('Please enter a target domain');
                 return;
+            }
+            
+            // Confirm deep analysis mode
+            if (mode === 'deep') {
+                const confirm = window.confirm(
+                    'Deep Analysis Mode will:\n' +
+                    '• Perform advanced vulnerability verification\n' +
+                    '• Generate proof-of-concept exploits\n' +
+                    '• Collect comprehensive evidence\n' +
+                    '• Take 5-10 minutes to complete\n\n' +
+                    'Only proceed if you have authorization to test this target.\n\n' +
+                    'Continue with Deep Analysis?'
+                );
+                if (!confirm) return;
             }
             
             document.getElementById('startBtn').disabled = true;
@@ -662,7 +686,7 @@ DASHBOARD_TEMPLATE = '''
             fetch('/start_hunt', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({target: target})
+                body: JSON.stringify({target: target, mode: mode})
             })
             .then(response => response.json())
             .then(data => {
@@ -671,6 +695,9 @@ DASHBOARD_TEMPLATE = '''
                     resetButtons();
                 } else {
                     startStatusUpdates();
+                    if (mode === 'deep') {
+                        document.getElementById('currentPhase').style.color = '#ff6600';
+                    }
                 }
             })
             .catch(error => {
@@ -743,14 +770,21 @@ DASHBOARD_TEMPLATE = '''
                 return;
             }
             
-            findingsList.innerHTML = findings.map(finding => `
-                <div class="finding-item">
-                    <div class="finding-type">${finding.type}</div>
-                    <div class="finding-value">${finding.value}</div>
-                    <div><span class="finding-severity severity-${finding.severity}">${finding.severity.toUpperCase()}</span></div>
-                    <div style="font-size: 0.8em; color: #888; margin-top: 5px;">${new Date(finding.timestamp).toLocaleTimeString()}</div>
-                </div>
-            `).join('');
+            findingsList.innerHTML = findings.map(finding => {
+                const isVerified = finding.verified || finding.type === 'verified_vulnerability';
+                const verifiedBadge = isVerified ? '<span style="background: #00ff00; color: #000; padding: 2px 6px; border-radius: 3px; font-size: 0.7em; margin-left: 5px;">VERIFIED</span>' : '';
+                const evidenceBadge = finding.evidence_id ? '<span style="background: #0066cc; color: #fff; padding: 2px 6px; border-radius: 3px; font-size: 0.7em; margin-left: 5px;">EVIDENCE</span>' : '';
+                
+                return `
+                    <div class="finding-item" style="${isVerified ? 'border-left: 4px solid #00ff00;' : ''}">
+                        <div class="finding-type">${finding.type}${verifiedBadge}${evidenceBadge}</div>
+                        <div class="finding-value">${finding.value}</div>
+                        <div><span class="finding-severity severity-${finding.severity}">${finding.severity.toUpperCase()}</span></div>
+                        ${finding.details && finding.details.poc ? '<div style="font-size: 0.8em; color: #00ff00; margin-top: 3px;">📋 PoC Available</div>' : ''}
+                        <div style="font-size: 0.8em; color: #888; margin-top: 5px;">${new Date(finding.timestamp).toLocaleTimeString()}</div>
+                    </div>
+                `;
+            }).join('');
         }
         
         function updateChains(chains) {
@@ -800,17 +834,96 @@ def start_hunt():
     """Start a new hunt"""
     data = request.get_json()
     target = data.get('target', '').strip()
+    mode = data.get('mode', 'standard')  # standard or deep
     
     if not target:
         return jsonify({'error': 'Target is required'}), 400
     
     # Start hunt in background thread
-    hunter = LiveHunter(target)
-    hunt_thread = threading.Thread(target=hunter.start_hunt)
+    if mode == 'deep':
+        from deep_hunter import DeepHunter
+        hunter = DeepHunter(target)
+        hunt_thread = threading.Thread(target=run_deep_hunt, args=(hunter,))
+    else:
+        hunter = LiveHunter(target)
+        hunt_thread = threading.Thread(target=hunter.start_hunt)
+    
     hunt_thread.daemon = True
     hunt_thread.start()
     
-    return jsonify({'status': 'Hunt started', 'target': target})
+    return jsonify({'status': 'Hunt started', 'target': target, 'mode': mode})
+
+def run_deep_hunt(hunter):
+    """Run deep hunt with verification"""
+    global hunt_status
+    
+    try:
+        hunt_status['current_phase'] = 'Deep SQL Analysis'
+        hunt_status['progress'] = 20
+        
+        # Deep SQL injection testing
+        sql_vulns = hunter.deep_sql_injection_test(f"http://{hunter.target}")
+        for vuln in sql_vulns:
+            hunt_status['findings'].append({
+                'type': 'verified_vulnerability',
+                'value': f"VERIFIED: {vuln['type'].upper()} - {vuln['subtype']}",
+                'severity': vuln['severity'],
+                'timestamp': vuln['timestamp'],
+                'details': vuln,
+                'verified': True,
+                'evidence_id': vuln.get('evidence_id')
+            })
+        
+        hunt_status['current_phase'] = 'Deep XSS Analysis'
+        hunt_status['progress'] = 50
+        
+        # Deep XSS testing
+        xss_vulns = hunter.deep_xss_analysis(f"http://{hunter.target}")
+        for vuln in xss_vulns:
+            hunt_status['findings'].append({
+                'type': 'verified_vulnerability',
+                'value': f"VERIFIED: {vuln['type'].upper()} - {vuln['subtype']} context",
+                'severity': vuln['severity'],
+                'timestamp': vuln['timestamp'],
+                'details': vuln,
+                'verified': True,
+                'evidence_id': vuln.get('evidence_id')
+            })
+        
+        hunt_status['current_phase'] = 'Deep IDOR Analysis'
+        hunt_status['progress'] = 75
+        
+        # Deep IDOR testing
+        idor_vulns = hunter.deep_idor_analysis(f"http://{hunter.target}")
+        for vuln in idor_vulns:
+            hunt_status['findings'].append({
+                'type': 'verified_vulnerability',
+                'value': f"VERIFIED: {vuln['type'].upper()} - Unauthorized data access",
+                'severity': vuln['severity'],
+                'timestamp': vuln['timestamp'],
+                'details': vuln,
+                'verified': True,
+                'evidence_id': vuln.get('evidence_id')
+            })
+        
+        hunt_status['current_phase'] = 'Chain Analysis & Report Generation'
+        hunt_status['progress'] = 90
+        
+        # Generate comprehensive chains
+        chains = hunter.generate_comprehensive_chains()
+        hunt_status['chains'] = chains
+        
+        # Generate professional report
+        report = hunter.generate_professional_report(hunter.target)
+        hunt_status['report'] = report
+        
+        hunt_status['progress'] = 100
+        hunt_status['current_phase'] = 'Complete - Report Generated'
+        hunt_status['active'] = False
+        
+    except Exception as e:
+        hunt_status['current_phase'] = f'Error: {str(e)}'
+        hunt_status['active'] = False
 
 @app.route('/hunt_status')
 def get_hunt_status():
