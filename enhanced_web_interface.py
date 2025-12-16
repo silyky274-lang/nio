@@ -61,6 +61,24 @@ def start_hunt():
     if not target:
         return jsonify({'error': 'Target is required'})
     
+    # Auto-detect target type and fix URL scheme
+    if target_type == 'auto':
+        if target.startswith(("http://", "https://")) or "." in target:
+            target_type = 'url'
+            # Add https:// if no protocol specified
+            if not target.startswith(("http://", "https://")):
+                target = f"https://{target}"
+        else:
+            try:
+                import ipaddress
+                ipaddress.ip_address(target)
+                target_type = 'ip'
+            except:
+                target_type = 'url'
+                # Add https:// if no protocol specified
+                if not target.startswith(("http://", "https://")):
+                    target = f"https://{target}"
+    
     # Reset hunt status
     hunt_status.update({
         'active': True,
@@ -179,6 +197,11 @@ def run_hunt(target, target_type, analysis_mode):
     global hunt_status, analyzer
     
     try:
+        # Fix URL scheme if missing
+        if target_type == 'url' and not target.startswith(('http://', 'https://')):
+            target = f'https://{target}'
+            hunt_status['target'] = target
+        
         analyzer = MultiTargetAnalyzer()
         
         # Update progress phases
