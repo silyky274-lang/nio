@@ -152,12 +152,23 @@ class ApexHunterOrchestrator:
     
     def initialize_knowledge_base(self):
         """Initialize knowledge base if not present"""
-        kb_path = Path('/workspace/project/mr-mx-lee-/data/knowledge_base.db')
+        # Create required directories
+        os.makedirs('data', exist_ok=True)
+        os.makedirs('sources', exist_ok=True)
+        os.makedirs('tools', exist_ok=True)
+        os.makedirs('config', exist_ok=True)
+        os.makedirs('logs', exist_ok=True)
+        os.makedirs('reports/evidence', exist_ok=True)
+        os.makedirs('reports/submissions', exist_ok=True)
+        os.makedirs('reports/templates', exist_ok=True)
+        
+        kb_path = Path('data/knowledge_base.db')
         
         if not kb_path.exists():
             print("🔄 Building knowledge base (first run)...")
-            collector = DataCollector()
-            collector.build_complete_knowledge_base()
+            # Use the create_knowledge_base.py script instead
+            import subprocess
+            subprocess.run(['python', 'create_knowledge_base.py'], check=True)
         else:
             print("✅ Knowledge base found")
     
